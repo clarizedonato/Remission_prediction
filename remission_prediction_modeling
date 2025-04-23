@@ -1,0 +1,293 @@
+%%remission_noddi_cleaned
+%%models:
+%% 1. Age+sex+blmadrs 
+%% 2. Age+sex+blmadrs+fiso 
+%% 3. Age+sex+blmadrs+ct 
+%% 4. Age+sex+blmadrs+fiso+ct
+
+%%building Xlogist and Ylogist for each level 
+%start with most complicated first, then substract each
+%%use isovf_step1_complete as the main table
+
+%%building fISO and CT 
+fISO = isovf_step1_final(:, [696, 697, 712, 713, 727:760, 762:795, 797, 798]);
+fISO = table2array(fISO);
+%%isovf_step1_final.fISO = fISO;
+isovf_step1_complete.fISO = fISO;
+
+%%isovf_step1_final_duplicate = isovf_step1_final; isovf_step1_final_duplicate(91, :) = [];
+%%fISO_complete=isovf_step1_final_duplicate(:, [696, 697, 712, 713, 727:760, 762:795, 797, 798]);
+%%fISO_complete = table2array(fISO_complete);
+%%isovf_step1_complete.fISO = fISO_complete;
+
+CT = isovf_step1_complete(:,[675, 676, 682, 683, 600:667, 686, 687]);
+CT = table2array(CT);
+isovf_step1_complete.CT = CT;
+
+%%building Xlogist_fISO_ct and Ylogist_fISO_ct for age+sex+blmadrs+fiso+ct (n=150)
+Xlogist_fISO_ct=[isovf_step1_complete.fISO, isovf_step1_complete.CT, isovf_step1_complete.AGE, isovf_step1_complete.GENDER, isovf_step1_complete.baseline_madrs];
+varnames_fISO_ct=horzcat(roinames, names, {'age'}, {'sex'}, {'baseline_madrs'});
+Ylogist_fISO_ct=isovf_step1_complete.remission;
+
+ix=isnan(Xlogist_fISO_ct(:,1)) | isnan(Ylogist_fISO_ct);
+Ylogist_fISO_ct(ix==1,:)=[];Xlogist_fISO_ct(ix==1,:)=[];
+
+%% age + sex + blmadrs + fISO + ct 
+
+figure;coef_all_fISO_ct=[];confusionmatrices_fISO_ct=[];yhat_all_fISO_ct=[];ytest_all_fISO_ct=[];yhatBinom_all_fISO_ct=[];
+rng(2); permutation_index = randperm(length(Ylogist_fISO_ct));
+for i=1:7 
+i
+    if(i==1); ix=zeros([150,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+30)=1; else
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+20)=1; end
+ix=ix(permutation_index);
+XTest_fISO_ct=Xlogist_fISO_ct(ix==1,:);XTrain_fISO_ct=Xlogist_fISO_ct(ix==0,:); 
+yTest_fISO_ct=Ylogist_fISO_ct(ix==1);yTrain_fISO_ct=Ylogist_fISO_ct(ix==0);
+
+[B_fISO_ct,FitInfo_fISO_ct] = lassoglm(XTrain_fISO_ct,yTrain_fISO_ct,'binomial','CV',10, 'PredictorNames', varnames_fISO_ct,'alpha', 0.3); 
+idxLambdaMinDeviance_fISO_ct = FitInfo_fISO_ct.IndexMinDeviance;
+B0_fISO_ct = FitInfo_fISO_ct.Intercept(idxLambdaMinDeviance_fISO_ct);
+coef_fISO_ct = [B0_fISO_ct; B_fISO_ct(:,idxLambdaMinDeviance_fISO_ct)]; coef_all_fISO_ct=[coef_all_fISO_ct,coef_fISO_ct];
+yhat_fISO_ct = glmval(coef_fISO_ct,XTest_fISO_ct,'logit');yhat_all_fISO_ct=[yhat_all_fISO_ct; yhat_fISO_ct];ytest_all_fISO_ct=[ytest_all_fISO_ct; yTest_fISO_ct];
+yhatBinom_fISO_ct = (yhat_fISO_ct>=0.35);yhatBinom_all_fISO_ct=[yhatBinom_all_fISO_ct; yhatBinom_fISO_ct];
+[X_fISO_ct,Y_fISO_ct,T_fISO_ct,AUC_fISO_ct] = perfcurve(yTest_fISO_ct,yhat_fISO_ct, 1);AUC_test_fISO_ct(i)=AUC_fISO_ct;
+end
+AUC_test_fISO_ct 
+
+[X_fISO_ct,Y_fISO_ct,T_fISO_ct,AUC_fISO_ct] = perfcurve(ytest_all_fISO_ct,yhat_all_fISO_ct, 1);AUC_fISO_ct 
+mean(AUC_test_fISO_ct)
+
+figure;
+plot(X_fISO_ct, Y_fISO_ct);
+xlabel('False Positive Rate');
+ylabel('True Positive Rate');
+
+%%building Xlogist_ct and Ylogist_ct for age+sex+baseline_madrs+ct (n=150)
+Xlogist_ct= Xlogist_fISO_ct(:, 75:end);
+varnames_ct=horzcat(names, {'age'}, {'sex'}, {'baseline_madrs'});
+Ylogist_ct=Ylogist_fISO_ct;
+
+%% age + sex + blmadrs + ct
+
+figure;coef_all_ct=[];confusionmatrices_ct=[];yhat_all_ct=[];ytest_all_ct=[];yhatBinom_all_ct=[];
+rng(2); permutation_index = randperm(length(Ylogist_ct));
+for i=1:7 
+i
+    if(i==1); ix=zeros([150,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+30)=1; else
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+20)=1; end
+ix=ix(permutation_index);
+XTest_ct=Xlogist_ct(ix==1,:);XTrain_ct=Xlogist_ct(ix==0,:); 
+yTest_ct=Ylogist_ct(ix==1);yTrain_ct=Ylogist_ct(ix==0);
+
+[B_ct,FitInfo_ct] = lassoglm(XTrain_ct,yTrain_ct,'binomial','CV',10, 'PredictorNames', varnames_ct,'alpha', 0.3); 
+idxLambdaMinDeviance_ct = FitInfo_ct.IndexMinDeviance;
+B0_ct = FitInfo_ct.Intercept(idxLambdaMinDeviance_ct);
+coef_ct = [B0_ct; B_ct(:,idxLambdaMinDeviance_ct)]; coef_all_ct=[coef_all_ct,coef_ct];
+yhat_ct = glmval(coef_ct,XTest_ct,'logit');yhat_all_ct=[yhat_all_ct; yhat_ct];ytest_all_ct=[ytest_all_ct; yTest_ct];
+yhatBinom_ct = (yhat_ct>=0.35);yhatBinom_all_ct=[yhatBinom_all_ct; yhatBinom_ct];
+[X_ct,Y_ct,T_ct,AUC_ct] = perfcurve(yTest_ct,yhat_ct, 1);AUC_test_ct(i)=AUC_ct;
+end
+AUC_test_ct 
+
+[X_ct,Y_ct,T_ct,AUC_ct] = perfcurve(ytest_all_ct,yhat_all_ct, 1);AUC_ct 
+mean(AUC_test_ct)
+
+%%building Xlogist_fISO and Ylogist_fISO for age+sex+baseline_madrs+fISO (n=150)
+Xlogist_fISO=[Xlogist_fISO_ct(:, 1:74), Xlogist_fISO_ct(:, end-2:end)];
+varnames_fISO=horzcat(roinames, {'age'}, {'sex'}, {'baseline_madrs'});
+Ylogist_fISO=Ylogist_fISO_ct;
+
+%% age + sex + blmadrs + fISO
+figure;coef_all_fISO=[];confusionmatrices_fISO=[];yhat_all_fISO=[];ytest_all_fISO=[];yhatBinom_all_fISO=[];
+rng(2); permutation_index = randperm(length(Ylogist_fISO));
+for i=1:7 
+i
+    if(i==1); ix=zeros([150,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+30)=1; else
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+20)=1; end
+ix=ix(permutation_index);
+XTest_fISO=Xlogist_fISO(ix==1,:);XTrain_fISO=Xlogist_fISO(ix==0,:); 
+yTest_fISO=Ylogist_fISO(ix==1);yTrain_fISO=Ylogist_fISO(ix==0);
+
+[B_fISO,FitInfo_fISO] = lassoglm(XTrain_fISO,yTrain_fISO,'binomial','CV',10, 'PredictorNames', varnames_fISO,'alpha', 0.3); 
+idxLambdaMinDeviance_fISO = FitInfo_fISO.IndexMinDeviance;
+B0_fISO = FitInfo_fISO.Intercept(idxLambdaMinDeviance_fISO);
+coef_fISO = [B0_fISO; B_fISO(:,idxLambdaMinDeviance_fISO)]; coef_all_fISO=[coef_all_fISO,coef_fISO];
+yhat_fISO = glmval(coef_fISO,XTest_fISO,'logit');yhat_all_fISO=[yhat_all_fISO; yhat_fISO];ytest_all_fISO=[ytest_all_fISO; yTest_fISO];
+yhatBinom_fISO = (yhat_fISO>=0.35);yhatBinom_all_fISO=[yhatBinom_all_fISO; yhatBinom_fISO];
+[X_fISO,Y_fISO,T_fISO,AUC_fISO] = perfcurve(yTest_fISO,yhat_fISO, 1);AUC_test_fISO(i)=AUC_fISO;
+end
+AUC_test_fISO 
+
+[X_fISO,Y_fISO,T_fISO,AUC_fISO] = perfcurve(ytest_all_fISO,yhat_all_fISO, 1);AUC_fISO 
+mean(AUC_test_fISO)
+
+%%building Xlogist and Ylogist for age + sex + baseline_madrs (n=150)
+Xlogist=Xlogist_fISO_ct(:, end-2:end);
+varnames=horzcat({'age'}, {'sex'}, {'baseline_madrs'});
+Ylogist=Ylogist_fISO_ct;
+
+%% age + sex + blmadrs
+figure;coef_all=[];confusionmatrices=[];yhat_all=[];ytest_all=[];yhatBinom_all=[];
+rng(2); permutation_index = randperm(length(Ylogist));
+for i=1:7 
+i
+    if(i==1); ix=zeros([150,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+30)=1; else
+    ix=zeros([150,1]); ix(20*(i-1)+1:20*(i-1)+20)=1; end
+ix=ix(permutation_index);
+XTest=Xlogist(ix==1,:);XTrain=Xlogist(ix==0,:); 
+yTest=Ylogist(ix==1);yTrain=Ylogist(ix==0);
+
+[B,FitInfo] = lassoglm(XTrain,yTrain,'binomial','CV',10, 'PredictorNames', varnames,'alpha', 0.3); 
+idxLambdaMinDeviance = FitInfo.IndexMinDeviance;
+B0 = FitInfo.Intercept(idxLambdaMinDeviance);
+coef = [B0; B(:,idxLambdaMinDeviance)]; coef_all=[coef_all,coef];
+yhat = glmval(coef,XTest,'logit');yhat_all=[yhat_all; yhat];ytest_all=[ytest_all; yTest];
+yhatBinom = (yhat>=0.35);yhatBinom_all=[yhatBinom_all; yhatBinom];
+[X,Y,T,AUC] = perfcurve(yTest,yhat, 1);AUC_test(i)=AUC;
+end
+AUC_test
+
+[X,Y,T,AUC] = perfcurve(ytest_all,yhat_all, 1);AUC 
+mean(AUC_test)
+
+%%extra models 
+%% 1. Age+sex+blmadrs+delmem
+%% 2. Age+sex+blmadrs+fiso+delmem
+%% 3. Age+sex+blmadrs+ct+delmem
+%% 4. Age+sex+blmadrs+fiso+ct+delmem
+
+%%building Xlogist and Ylogist for each level 
+%start with most complicated first, then substract each
+%%use isovf_step1_complete as the main table
+
+%%building model for age+sex+blmadrs+fiso+ct+delmem
+Xlogist_fISO_ct_delmem=[isovf_step1_complete.fISO, isovf_step1_complete.CT, isovf_step1_complete.AGE, isovf_step1_complete.GENDER, isovf_step1_complete.baseline_madrs, isovf_step1_complete.MDMIS_01];
+varnames_fISO_ct_delmem=horzcat(roinames, names, {'age'}, {'sex'}, {'baseline_madrs'}, {'delmem'});
+Ylogist_fISO_ct_delmem=isovf_step1_complete.remission;
+
+ix=isnan(Xlogist_fISO_ct_delmem(:,1)) | isnan(Ylogist_fISO_ct_delmem);
+Ylogist_fISO_ct_delmem(ix==1,:)=[];Xlogist_fISO_ct_delmem(ix==1,:)=[];
+
+%%get rid of any rows that have NaN for delayed memory score
+Ylogist_fISO_ct_delmem = Ylogist_fISO_ct_delmem(~any(isnan(Xlogist_fISO_ct_delmem), 2), :);
+Xlogist_fISO_ct_delmem = Xlogist_fISO_ct_delmem(~any(isnan(Xlogist_fISO_ct_delmem), 2), :);
+
+%% age + sex + blmadrs + fISO + ct + delmem (n=144)
+
+figure;coef_all_fISO_ct_delmem=[];confusionmatrices_fISO_ct_delmem=[];yhat_all_fISO_ct_delmem=[];ytest_all_fISO_ct_delmem=[];yhatBinom_all_fISO_ct_delmem=[];
+rng(2); permutation_index = randperm(length(Ylogist_fISO_ct_delmem));
+for i=1:7 
+i
+    if(i==1); ix=zeros([144,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+24)=1; else
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+14)=1; end
+ix=ix(permutation_index);
+XTest_fISO_ct_delmem=Xlogist_fISO_ct_delmem(ix==1,:);XTrain_fISO_ct_delmem=Xlogist_fISO_ct_delmem(ix==0,:); 
+yTest_fISO_ct_delmem=Ylogist_fISO_ct_delmem(ix==1);yTrain_fISO_ct_delmem=Ylogist_fISO_ct_delmem(ix==0);
+
+[B_fISO_ct_delmem,FitInfo_fISO_ct_delmem] = lassoglm(XTrain_fISO_ct_delmem,yTrain_fISO_ct_delmem,'binomial','CV',10, 'PredictorNames', varnames_fISO_ct_delmem,'alpha', 0.6); 
+idxLambdaMinDeviance_fISO_ct_delmem = FitInfo_fISO_ct_delmem.IndexMinDeviance;
+B0_fISO_ct_delmem = FitInfo_fISO_ct_delmem.Intercept(idxLambdaMinDeviance_fISO_ct_delmem);
+coef_fISO_ct_delmem = [B0_fISO_ct_delmem; B_fISO_ct_delmem(:,idxLambdaMinDeviance_fISO_ct_delmem)]; coef_all_fISO_ct_delmem=[coef_all_fISO_ct_delmem,coef_fISO_ct_delmem];
+yhat_fISO_ct_delmem = glmval(coef_fISO_ct_delmem,XTest_fISO_ct_delmem,'logit');yhat_all_fISO_ct_delmem=[yhat_all_fISO_ct_delmem; yhat_fISO_ct_delmem];ytest_all_fISO_ct_delmem=[ytest_all_fISO_ct_delmem; yTest_fISO_ct_delmem];
+yhatBinom_fISO_ct_delmem = (yhat_fISO_ct_delmem>=0.35);yhatBinom_all_fISO_ct_delmem=[yhatBinom_all_fISO_ct_delmem; yhatBinom_fISO_ct_delmem];
+[X,Y,T,AUC_fISO_ct_delmem] = perfcurve(yTest_fISO_ct_delmem,yhat_fISO_ct_delmem, 1);AUC_test_fISO_ct_delmem(i)=AUC_fISO_ct_delmem;
+end
+AUC_test_fISO_ct_delmem 
+
+[X,Y,T,AUC_fISO_ct_delmem] = perfcurve(ytest_all_fISO_ct_delmem,yhat_all_fISO_ct_delmem, 1);AUC_fISO_ct_delmem 
+mean(AUC_test_fISO_ct_delmem)
+
+%%building Xlogist and Ylogist for model for age+sex+blmadrs+ct+delmem 
+Xlogist_ct_delmem= Xlogist_fISO_ct_delmem(:, 75:end);
+varnames_ct_delmem=horzcat(names, {'age'}, {'sex'}, {'baseline_madrs'}, {'delmem'});
+Ylogist_ct_delmem=Ylogist_fISO_ct_delmem;
+
+%% age + sex + blmadrs + ct + delmem (n=144)
+figure;coef_all_ct_delmem=[];confusionmatrices_ct_delmem=[];yhat_all_ct_delmem=[];ytest_all_ct_delmem=[];yhatBinom_all_ct_delmem=[];
+rng(2); permutation_index = randperm(length(Ylogist_ct_delmem));
+for i=1:7 
+i
+    if(i==1); ix=zeros([144,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+24)=1; else
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+14)=1; end
+ix=ix(permutation_index);
+XTest_ct_delmem=Xlogist_ct_delmem(ix==1,:);XTrain_ct_delmem=Xlogist_ct_delmem(ix==0,:); 
+yTest_ct_delmem=Ylogist_ct_delmem(ix==1);yTrain_ct_delmem=Ylogist_ct_delmem(ix==0);
+
+[B_ct_delmem,FitInfo_ct_delmem] = lassoglm(XTrain_ct_delmem,yTrain_ct_delmem,'binomial','CV',10, 'PredictorNames', varnames_ct_delmem,'alpha', 0.6); 
+idxLambdaMinDeviance_ct_delmem = FitInfo_ct_delmem.IndexMinDeviance;
+B0_ct_delmem = FitInfo_ct_delmem.Intercept(idxLambdaMinDeviance_ct_delmem);
+coef_ct_delmem = [B0_ct_delmem; B_ct_delmem(:,idxLambdaMinDeviance_ct_delmem)]; coef_all_ct_delmem=[coef_all_ct_delmem,coef_ct_delmem];
+yhat_ct_delmem = glmval(coef_ct_delmem,XTest_ct_delmem,'logit');yhat_all_ct_delmem=[yhat_all_ct_delmem; yhat_ct_delmem];ytest_all_ct_delmem=[ytest_all_ct_delmem; yTest_ct_delmem];
+yhatBinom_ct_delmem = (yhat_ct_delmem>=0.35);yhatBinom_all_ct_delmem=[yhatBinom_all_ct_delmem; yhatBinom_ct_delmem];
+[X,Y,T,AUC_ct_delmem] = perfcurve(yTest_ct_delmem,yhat_ct_delmem, 1);AUC_test_ct_delmem(i)=AUC_ct_delmem;
+end
+AUC_test_ct_delmem 
+
+[X,Y,T,AUC_ct_delmem] = perfcurve(ytest_all_ct_delmem,yhat_all_ct_delmem, 1);AUC_ct_delmem 
+mean(AUC_test_ct_delmem)
+
+%%building Xlogist_fISO and Ylogist_fISO for age+sex+baseline_madrs+fISO+delayed memory(n=144)
+Xlogist_fISO_delmem=[Xlogist_fISO_ct_delmem(:, 1:74), Xlogist_fISO_ct_delmem(:, end-3:end)];
+varnames_fISO_delmem=horzcat(roinames, {'age'}, {'sex'}, {'baseline_madrs'}, {'delmem'});
+Ylogist_fISO_delmem=Ylogist_fISO_ct_delmem;
+
+%% model: age + sex + blmadrs + fISO + delayed memory (n=144) 
+figure;coef_all_fISO_delmem=[];confusionmatrices_fISO_delmem=[];yhat_all_fISO_delmem=[];ytest_all_fISO_delmem=[];yhatBinom_all_fISO_delmem=[];
+rng(2); permutation_index = randperm(length(Ylogist_fISO_delmem));
+for i=1:7 
+i
+    if(i==1); ix=zeros([144,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+24)=1; else
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+14)=1; end
+ix=ix(permutation_index);
+XTest_fISO_delmem=Xlogist_fISO_delmem(ix==1,:);XTrain_fISO_delmem=Xlogist_fISO_delmem(ix==0,:); 
+yTest_fISO_delmem=Ylogist_fISO_delmem(ix==1);yTrain_fISO_delmem=Ylogist_fISO_delmem(ix==0);
+
+[B_fISO_delmem,FitInfo_fISO_delmem] = lassoglm(XTrain_fISO_delmem,yTrain_fISO_delmem,'binomial','CV',10, 'PredictorNames', varnames_fISO_delmem,'alpha', 0.6); 
+idxLambdaMinDeviance_fISO_delmem = FitInfo_fISO_delmem.IndexMinDeviance;
+B0_fISO_delmem = FitInfo_fISO_delmem.Intercept(idxLambdaMinDeviance_fISO_delmem);
+coef_fISO_delmem = [B0_fISO_delmem; B_fISO_delmem(:,idxLambdaMinDeviance_fISO_delmem)]; coef_all_fISO_delmem=[coef_all_fISO_delmem,coef_fISO_delmem];
+yhat_fISO_delmem = glmval(coef_fISO_delmem,XTest_fISO_delmem,'logit');yhat_all_fISO_delmem=[yhat_all_fISO_delmem; yhat_fISO_delmem];ytest_all_fISO_delmem=[ytest_all_fISO_delmem; yTest_fISO_delmem];
+yhatBinom_fISO_delmem = (yhat_fISO_delmem>=0.35);yhatBinom_all_fISO_delmem=[yhatBinom_all_fISO_delmem; yhatBinom_fISO_delmem];
+[X,Y,T,AUC_fISO_delmem] = perfcurve(yTest_fISO_delmem,yhat_fISO_delmem, 1);AUC_test_fISO_delmem(i)=AUC_fISO_delmem;
+end
+AUC_test_fISO_delmem 
+
+[X,Y,T,AUC_fISO_delmem] = perfcurve(ytest_all_fISO_delmem,yhat_all_fISO_delmem, 1);AUC_fISO_delmem 
+mean(AUC_test_fISO_delmem)
+
+%%building Xlogist and Ylogist for age + sex + baseline_madrs + delayed memory (n=144)
+Xlogist_delmem=Xlogist_fISO_ct_delmem(:, end-3:end);
+varnames_delmem=horzcat({'age'}, {'sex'}, {'baseline_madrs'}, {'delmem'});
+Ylogist_delmem=Ylogist_fISO_ct_delmem;
+
+%% model : age + sex + blmadrs + delmem (n=144)
+figure;coef_all_delmem=[];confusionmatrices_delmem=[];yhat_all_delmem=[];ytest_all_delmem=[];yhatBinom_all_delmem=[];
+rng(2); permutation_index = randperm(length(Ylogist_delmem));
+for i=1:7 
+i
+    if(i==1); ix=zeros([144,1]); ix(1:20)=1; elseif (i==7)
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+24)=1; else
+    ix=zeros([144,1]); ix(20*(i-1)+1:20*(i-1)+14)=1; end
+ix=ix(permutation_index);
+XTest_delmem=Xlogist_delmem(ix==1,:);XTrain_delmem=Xlogist_delmem(ix==0,:); 
+yTest_delmem=Ylogist_delmem(ix==1);yTrain_delmem=Ylogist_delmem(ix==0);
+
+[B_delmem,FitInfo_delmem] = lassoglm(XTrain_delmem,yTrain_delmem,'binomial','CV',10, 'PredictorNames', varnames_delmem,'alpha', 0.6); 
+idxLambdaMinDeviance_delmem = FitInfo_delmem.IndexMinDeviance;
+B0_delmem = FitInfo_delmem.Intercept(idxLambdaMinDeviance_delmem);
+coef_delmem = [B0_delmem; B_delmem(:,idxLambdaMinDeviance_delmem)]; coef_all_delmem=[coef_all_delmem,coef_delmem];
+yhat_delmem = glmval(coef_delmem,XTest_delmem,'logit');yhat_all_delmem=[yhat_all_delmem; yhat_delmem];ytest_all_delmem=[ytest_all_delmem; yTest_delmem];
+yhatBinom_delmem = (yhat_delmem>=0.35);yhatBinom_all_delmem=[yhatBinom_all_delmem; yhatBinom_delmem];
+[X,Y,T,AUC_delmem] = perfcurve(yTest_delmem,yhat_delmem, 1);AUC_test_delmem(i)=AUC_delmem;
+end
+AUC_test_delmem 
+
+[X,Y,T,AUC_delmem] = perfcurve(ytest_all_delmem,yhat_all_delmem, 1);AUC_delmem 
+mean(AUC_test_delmem)
