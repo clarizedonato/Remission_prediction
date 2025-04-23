@@ -1,0 +1,19 @@
+%% Plotting AUC curves
+%%can do hold on and then just add each of them to the same graph
+figure;
+plot(X_fISO_ct, Y_fISO_ct, 'LineWidth', 1, 'Color', 'k'); %black
+hold on;
+plot(X_ct, Y_ct, 'LineWidth', 1, 'Color', [0.4940 0.1840 0.5560]); %purple
+hold on; 
+plot(X_fISO, Y_fISO, 'LineWidth', 1, 'Color','m'); %magenta
+hold on;
+plot(X, Y, 'LineWidth', 1, 'Color',[1.00, 0.75, 0.796]); %pink
+
+all_AUCs = [0.6568, 0.6670, 0.6804, 0.6981]
+%%barcolours = fISO, cog + clinical, ct + fISO, ct 
+%%barcolours = magenta, pink, purple, black 
+barcolours = [[1 0 1];[1.00, 0.75, 0.796];[0.4940 0.1840 0.5560];[0 0 0]];
+figure;
+AUC_barplot = bar(all_AUCs,'BarWidth', 0.8);
+AUC_barplot.FaceColor = 'flat';
+AUC_barplot.CData = barcolours;
