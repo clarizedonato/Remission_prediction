@@ -1,3 +1,5 @@
+%%you can change your models to whatever you are interested in, and all data should be in an array
+
 %%remission_noddi_cleaned
 %%models:
 %% 1. Age+sex+blmadrs 
